@@ -1,0 +1,152 @@
+SET SEARCH_PATH = PIZZA_RUNNER;
+
+
+SELECT *
+FROM CUSTOMER_ORDERS;
+
+
+SELECT *
+FROM PIZZA_NAMES;
+
+
+SELECT *
+FROM PIZZA_RECIPES;
+
+
+SELECT *
+FROM PIZZA_TOPPINGS;
+
+
+SELECT *
+FROM RUNNER_ORDERS;
+
+
+SELECT *
+FROM RUNNERS;
+-- Data Cleaning & Transformation
+select * 
+from customer_orders;
+
+create temp table temp_customer_orders as
+select * 
+from customer_orders;
+select * from temp_customer_orders;
+
+update temp_customer_orders set extras=' ' where extras is not null or null;
+update temp_customer_orders set exclusions=' ' where exclusions is not null or null ; 
+
+-- How many pizzas were ordered?
+
+SELECT COUNT(ORDER_ID) AS TOTAL_ORDER_PIZZ
+FROM CUSTOMER_ORDERS ;
+
+-- How many unique customer orders were made?
+
+SELECT COUNT(DISTINCT CUSTOMER_ID) AS UNIQUE_CUSTOMER
+FROM CUSTOMER_ORDERS;
+
+-- How many successful orders were delivered by each runner?
+
+SELECT RUNNER_ID,
+	COUNT(ORDER_ID) AS SUCCESSFUL_DELIVERY
+FROM RUNNER_ORDERS
+WHERE DURATION <> 'null'
+GROUP BY RUNNER_ID 
+
+-- How many of each type of pizza was delivered?
+
+SELECT P.PIZZA_NAME,
+	COUNT(C.ORDER_ID) AS TOTAL_DELIVERY
+FROM CUSTOMER_ORDERS C
+INNER JOIN PIZZA_NAMES P ON C.PIZZA_ID = P.PIZZA_ID
+INNER JOIN RUNNER_ORDERS R ON C.ORDER_ID = R.ORDER_ID
+WHERE R.DURATION <> 'null'
+GROUP BY P.PIZZA_NAME 
+
+-- How many Vegetarian and Meatlovers were ordered by each customer?
+
+SELECT P.PIZZA_NAME,
+	C.CUSTOMER_ID,
+	COUNT(C.ORDER_ID) AS TOTAL_ORDER
+FROM CUSTOMER_ORDERS C
+INNER JOIN PIZZA_NAMES P ON C.PIZZA_ID = P.PIZZA_ID
+GROUP BY C.CUSTOMER_ID,
+	P.PIZZA_NAME 
+	
+-- What was the maximum number of pizzas delivered in a single order?
+ WITH CTE AS
+	(SELECT C.ORDER_ID,
+			COUNT(C.PIZZA_ID) AS TOTAL_DELIVERY_IN_ROW
+		FROM CUSTOMER_ORDERS C
+		INNER JOIN RUNNER_ORDERS R ON C.ORDER_ID = R.ORDER_ID
+		WHERE R.PICKUP_TIME <> 'null'
+			AND R.DISTANCE <> 'null'
+			AND R.DURATION <> 'null'
+		GROUP BY C.ORDER_ID
+		ORDER BY TOTAL_DELIVERY_IN_ROW DESC)
+SELECT ORDER_ID,
+	TOTAL_DELIVERY_IN_ROW
+FROM CTE
+WHERE TOTAL_DELIVERY_IN_ROW =
+		(SELECT MAX(TOTAL_DELIVERY_IN_ROW)
+			FROM CTE) 
+			
+-- For each customer, how many delivered pizzas had at least 1 change and how many had no changes?
+
+
+SELECT C.CUSTOMER_ID,
+	SUM(CASE
+									WHEN C.EXCLUSIONS IS NOT NULL
+														OR C.EXTRAS IS NOT NULL THEN 1
+									ELSE 0
+					END) AS AT_LEAST_ONE_CHANGE,
+	SUM(CASE
+									WHEN C.EXCLUSIONS IS NULL
+														OR C.EXTRAS IS NULL THEN 1
+									ELSE 0
+					END) AS NO_CHANGE
+FROM CUSTOMER_ORDERS C
+INNER JOIN RUNNER_ORDERS R ON C.ORDER_ID = R.ORDER_ID
+WHERE R.DISTANCE <> 'null'
+GROUP BY C.CUSTOMER_ID
+ORDER BY C.CUSTOMER_ID
+
+-- How many pizzas were delivered that had both exclusions and extras?
+
+SELECT C.order_id,
+	sum(
+	case when C.EXCLUSIONS IS NOT NULL and C.EXTRAS IS NOT NULL THEN 1
+		else 0
+		end
+	) as with_exc_extra
+FROM CUSTOMER_ORDERS C
+INNER JOIN RUNNER_ORDERS R ON C.ORDER_ID = R.ORDER_ID
+WHERE R.DISTANCE <> 'null'
+GROUP BY C.order_id
+ORDER BY C.order_id
+
+-- What was the total volume of pizzas ordered for each hour of the day?
+
+SELECT DATE_PART('hour',order_time) AS HOUR_OF_THE_DAY,
+	COUNT(ORDER_ID) AS PIZZA_COUNT
+FROM TEMP_CUSTOMER_ORDERS
+GROUP BY DATE_PART('hour',order_time)
+
+-- What was the volume of orders for each day of the week?
+
+SELECT 
+  TO_CHAR(DATE_ADD('day',-2,order_time) , 'DAY') AS day_of_week, -- add 2 to adjust 1st day of the week as Monday
+  COUNT(order_id) AS total_pizzas_ordered
+FROM temp_customer_orders
+GROUP BY TO_CHAR(DATE_ADD('day',2,order_time) , 'DAY') ;
+
+SELECT 
+  FORMAT(DATEADD('DAY', 2, order_time),'day') AS day_of_week, -- add 2 to adjust 1st day of the week as Monday
+  COUNT(order_id) AS total_pizzas_ordered
+FROM customer_orders
+GROUP BY FORMAT(DATEADD('DAY', 2, order_time),'day');
+
+
+
+
+
